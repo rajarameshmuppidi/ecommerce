@@ -1,0 +1,42 @@
+﻿using EcommercePlatform.Dtos;
+using EcommercePlatform.Models;
+using EcommercePlatform.Repositories;
+using EcommercePlatform.Utilities;
+using System.Threading.Tasks;
+
+namespace EcommercePlatform.Services
+{
+
+    public class ProductService(IProductsRepository productsRepository) : IProductService
+    {
+        public async Task<string> CreateProductAsync(string sellerId, Product product)
+        {
+            var res = await productsRepository.CreateProductAsync(sellerId, product);
+            return res.ToString();
+        }
+
+        public async Task<bool> DeleteByIdAsync(Guid id)
+        {
+            var res = await productsRepository.DeleteProductAsync(id);
+            return res;
+        }
+
+        public async Task<IEnumerable<Product>?> GetAllProductsAsync(ProductParameters parameters)
+        {
+            var res = await productsRepository.GetProductsAsync(parameters);
+            return res;
+        }
+
+        public async Task<Product?> GetProductByIdAsync(Guid productId)
+        {
+            var product = await productsRepository.GetProductDetailsByIdAsync(productId);
+            return product;
+        }
+
+        public async Task<bool> UpdateProductAsync(Guid id, ProductUpdateDto dto)
+        {
+            var res = await productsRepository.UpdateProductAsync(id,dto);
+            return res;
+        }
+    }
+}

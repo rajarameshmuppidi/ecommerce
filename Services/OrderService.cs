@@ -1,0 +1,73 @@
+﻿
+using EcommercePlatform.Data;
+using EcommercePlatform.Dtos;
+using EcommercePlatform.Models;
+using EcommercePlatform.Repositories;
+using EcommercePlatform.Utilities;
+
+namespace EcommercePlatform.Services
+{
+    public class OrderService : IOrderService
+    {
+        private readonly IOrdersRepository orderRepository;
+        private readonly ICartRepository cartRepository;
+        private readonly AppDbContext dbContext;
+
+        public OrderService(IOrdersRepository orderRepository, ICartRepository cartRepository, AppDbContext dbContext)
+        {
+            this.orderRepository = orderRepository;
+            this.cartRepository = cartRepository;
+            this.dbContext = dbContext;
+        }
+
+        public async Task<IEnumerable<Order>> GetOrdersOfSellerAsync(OrderParameters parameters)
+        {
+            var result = await orderRepository.GetAllOrdersAsync(parameters);
+
+            return result;
+        }
+
+        public async Task<IEnumerable<Order>> GetOrdersOfUserAsync(OrderParameters parameters)
+        {
+            var result = await orderRepository.GetAllOrdersAsync(parameters);
+
+            return result;
+        }
+
+        public async Task<string> PlaceOrdersFromCart(Guid recentCartId)
+        {
+            using var transaction = await dbContext.Database.BeginTransactionAsync();
+            try
+            {
+                var ItemsInCart = await cartRepository.GetCartItems(recentCartId);
+
+                foreach (var Item in ItemsInCart)
+                {
+                    var ItemtoBeOrdered = new PlaceOrderDto
+                    {
+                        ProductId = Item.ProductId,
+                        Quantity = Item.Quantity,
+                        RecentCartId = recentCartId,
+                    };
+                    await orderRepository.CreateOrderAsync(ItemtoBeOrdered);
+                }
+                await cartRepository.UpdateRecentCartAfterOrder(recentCartId);
+                await dbContext.SaveChangesAsync();
+                await transaction.CommitAsync();
+                return "Success";
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                return ex.InnerException.Message;
+            }
+
+        }
+
+        public async Task<bool> UpdateOrderAsync(Guid orderId, UpdateOrderDto dto)
+        {
+            return await orderRepository.UpdateOrderAsync(orderId, dto);
+
+        }
+    }
+}
