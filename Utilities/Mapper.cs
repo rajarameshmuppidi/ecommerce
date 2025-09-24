@@ -1,6 +1,7 @@
 ﻿using EcommercePlatform.Data;
 using EcommercePlatform.Dtos;
 using EcommercePlatform.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace EcommercePlatform.Utilities
 {
@@ -15,12 +16,21 @@ namespace EcommercePlatform.Utilities
         public ProductDto MapProductToDto(ProductDto product)
         {
             var reviews = dbcontext.Reviews.Where(r => r.Product.Id == product.Id).ToList();
+            var reviewDtos = reviews.Select(r => new ReviewDto
+            {
+                Id = r.Id,
+                UserName = r.User?.AppUser?.UserName ?? "Anonymous",
+                Rating = r.Rating,
+                ReviewText = r.Review,
+                CreatedAt = r.CreatedAt
+            }).ToList();
+
             var seller = dbcontext.Sellers.Where(s => s.UserId == product.SellerId);
             return new ProductDto()
             {
                 Id = product.Id,
                 ProductTitle = product.ProductTitle,
-                Reviews = reviews,
+                Reviews = reviewDtos,
                 Price = product.Price,
                 SellerId = product.SellerId,
                 ProductDescription = product.ProductDescription,

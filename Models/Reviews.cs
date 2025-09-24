@@ -23,6 +23,8 @@ namespace EcommercePlatform.Models
         [StringLength(300)]
         public string Review { get; set; }
 
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
         
     }
 }

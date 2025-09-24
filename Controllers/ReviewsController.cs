@@ -1,8 +1,12 @@
-﻿using EcommercePlatform.Dtos;
+using EcommercePlatform.Dtos;
 using EcommercePlatform.Models;
 using EcommercePlatform.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using System.Linq;
+using System.Threading.Tasks;
+using System.Collections.Generic;
 
 namespace EcommercePlatform.Controllers
 {
@@ -26,11 +30,20 @@ namespace EcommercePlatform.Controllers
         }
 
         [HttpGet("{productId}")]
-        public async Task<ActionResult<IEnumerable<Reviews>>> GetReviewsOfTheProduct([FromRoute] Guid productId)
+        public async Task<ActionResult<IEnumerable<ReviewDto>>> GetReviewsOfTheProduct([FromRoute] Guid productId)
         {
-            var reviewsOfProduct = await reviewsService.ReviewsOfProductAsync(productId);
+            var reviews = await reviewsService.ReviewsOfProductAsync(productId);
+            
+            var reviewDtos = reviews.Select(r => new ReviewDto
+            {
+                Id = r.Id,
+                UserName = r.User?.AppUser?.UserName ?? "Anonymous",
+                Rating = r.Rating,
+                ReviewText = r.Review,
+                CreatedAt = r.CreatedAt
+            }).ToList();
 
-            return Ok(reviewsOfProduct);
+            return Ok(reviewDtos);
         }
     }
 }

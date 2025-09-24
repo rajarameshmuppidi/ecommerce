@@ -1,0 +1,89 @@
+﻿// hi from raja ramesh muppidi
+using EcommercePlatform.Data;
+using EcommercePlatform.Dtos;
+using EcommercePlatform.Models;
+using EcommercePlatform.Repositories;
+using EcommercePlatform.Utilities;
+
+namespace EcommercePlatform.Services
+{
+    public class OrderService : IOrderService
+    {
+        private readonly IOrdersRepository orderRepository;
+        private readonly ICartRepository cartRepository;
+        private readonly AppDbContext dbContext;
+
+        public OrderService(IOrdersRepository orderRepository, ICartRepository cartRepository, AppDbContext dbContext)
+        {
+            this.orderRepository = orderRepository;
+            this.cartRepository = cartRepository;
+            this.dbContext = dbContext;
+        }
+
+        public async Task<IEnumerable<Order>> GetOrdersOfSellerAsync(OrderParameters parameters)
+        {
+            var result = await orderRepository.GetAllOrdersAsync(parameters);
+
+            return result;
+        }
+
+        public async Task<IEnumerable<Order>> GetOrdersOfUserAsync(OrderParameters parameters)
+        {
+            var result = await orderRepository.GetAllOrdersAsync(parameters);
+
+            return result;
+        }
+
+        public async Task<string> PlaceOrdersFromCart(Guid recentCartId)
+        {
+            if (await cartRepository.IsCartOrdered(recentCartId))
+            {
+                return "CartEmpty";
+            }
+
+            using var transaction = await dbContext.Database.BeginTransactionAsync();
+            try
+            {
+                var ItemsInCart = await cartRepository.GetCartItems(recentCartId);
+                foreach (var Item in ItemsInCart)
+                {
+                    // Check product quantity before placing order
+                    var product = await dbContext.Products.FindAsync(Item.ProductId);
+                    if (product == null || product.Quantity <= 0)
+                    {
+                        await transaction.RollbackAsync();
+                        return "InsufficientStock";
+                    }
+                    var ItemtoBeOrdered = new PlaceOrderDto
+                    {
+                        ProductId = Item.ProductId,
+                        Quantity = Item.Quantity,
+                        RecentCartId = recentCartId,
+                    };
+                    var orderCreated = await orderRepository.CreateOrderAsync(ItemtoBeOrdered);
+                    if (!orderCreated)
+                    {
+                        await transaction.RollbackAsync();
+                        return "InsufficientStock";
+                    }
+                }
+                await cartRepository.UpdateRecentCartAfterOrder(recentCartId);
+                await dbContext.SaveChangesAsync();
+                await transaction.CommitAsync();
+                return "Success";
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                return ex.InnerException?.Message ?? ex.Message;
+            }
+
+        }
+
+        public async Task<bool> UpdateOrderAsync(Guid orderId, UpdateOrderDto dto)
+        {
+            return await orderRepository.UpdateOrderAsync(orderId, dto);
+
+        }
+    }
+}

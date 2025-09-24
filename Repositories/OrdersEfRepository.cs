@@ -1,4 +1,4 @@
-﻿using EcommercePlatform.Data;
+using EcommercePlatform.Data;
 using EcommercePlatform.Dtos;
 using EcommercePlatform.Models;
 using EcommercePlatform.Utilities;
@@ -13,8 +13,13 @@ namespace EcommercePlatform.Repositories
         public async Task<List<Order>> GetAllOrdersAsync(OrderParameters parameters)
         {
             var OrdersQuery = dbContext.Orders.Include(o => o.RecentCart)
-                .Where(o => o.RecentCart.UpdateDate >= (parameters.Startdate??DateTime.MinValue) && o.RecentCart.UpdateDate <= parameters.EndDate)
+                .Where(o => o.OrderedDate >= (parameters.Startdate??DateTime.MinValue) && (o.OrderedDate <= (parameters.EndDate??DateTime.MaxValue)))
                 .AsQueryable();
+
+            if(parameters.ProductId != null)
+            {
+                OrdersQuery = OrdersQuery.Where(o => o.ProductId == parameters.ProductId);
+            }
 
             if (parameters.UserId != null)
             {
@@ -36,11 +41,22 @@ namespace EcommercePlatform.Repositories
                 OrdersQuery = OrdersQuery.Where(o => o.PaymentStatus == parameters.PaymentStatus);
             }
 
+            if(TryParseSortField(parameters.SortBy ?? "OrderedDate", out SortSchemes sortField))
+            {
+                OrdersQuery = ApplySorting(OrdersQuery, sortField, parameters.Reverse);
+            }
+
             OrdersQuery = OrdersQuery.Skip(parameters.PageSize * parameters.PageNumber)
                                      .Take(parameters.PageSize);
 
-            return await OrdersQuery.ToListAsync();
+            return await OrdersQuery.Include(o => o.Product).ToListAsync();
         }
+
+        public static bool TryParseSortField(string input, out SortSchemes field)
+        {
+            return Enum.TryParse(input, ignoreCase: true, out field);
+        }
+
 
         public async Task<Order?> GetOrderByIdAsync(Guid orderId)
         {
@@ -51,19 +67,43 @@ namespace EcommercePlatform.Repositories
 
         public async Task<bool> CreateOrderAsync(PlaceOrderDto dto)
         {
+            var product = await dbContext.Products
+                .Include(p => p.Seller)
+                .FirstOrDefaultAsync(p => p.Id == dto.ProductId);
+                
+            if (product == null || product.Quantity < dto.Quantity)
+            {
+                return false;
+            }
+
+            // Get the recent cart to verify payment details
+            var recentCart = await dbContext.RecentCarts
+                .FirstOrDefaultAsync(rc => rc.Id == dto.RecentCartId);
+                
+            if (recentCart == null)
+            {
+                return false;
+            }
+
             var orderToBePlaced = new Order()
             {
                 ProductId = dto.ProductId,
                 RecentCartId = dto.RecentCartId,
                 Status = OrderStatus.Pending,
-                PaymentStatus = PaymentStatus.Pending,
+                // Use payment details from the DTO (which comes from RecentCart)
+                PaymentStatus = dto.PaymentStatus,
+                PaymentMethod = dto.PaymentMethod,
                 Quantity = dto.Quantity,
-                DeliveryDate = DateTime.UtcNow,
-                ExpectedDeliveryBy = DateTime.UtcNow.AddDays(8),
+                DeliveryDate = null, // Will be set when shipped
+                ExpectedDeliveryBy = DateTime.UtcNow.AddDays(7), // Default 7 days delivery
                 OrderedDate = DateTime.UtcNow
             };
 
+            // Update product quantity
+            product.Quantity -= dto.Quantity;
+
             await dbContext.Orders.AddAsync(orderToBePlaced);
+            await dbContext.SaveChangesAsync();
             return true;
         }
 
@@ -85,5 +125,19 @@ namespace EcommercePlatform.Repositories
             return false;
 
         }
+
+        public IQueryable<Order> ApplySorting(IQueryable<Order> query, SortSchemes field, bool descending)
+        {
+            return field switch
+            {
+                SortSchemes.OrderedDate => descending ? query.OrderByDescending(o => o.OrderedDate) : query.OrderBy(o => o.OrderedDate),
+                SortSchemes.ExpectedDate => descending ? query.OrderByDescending(o => o.ExpectedDeliveryBy) : query.OrderBy(o => o.ExpectedDeliveryBy),
+                SortSchemes.Price => descending ? query.OrderByDescending(o => o.Product.Price) : query.OrderBy(o => o.Product.Price),
+                SortSchemes.OrderStatus => descending ? query.OrderByDescending(o => o.Status) : query.OrderBy(o => o.Status),
+                SortSchemes.PaymentStatus => descending ? query.OrderByDescending(o => o.PaymentStatus) : query.OrderBy(o => o.PaymentStatus),
+                _ => query
+            };
+        }
+
     }
 }

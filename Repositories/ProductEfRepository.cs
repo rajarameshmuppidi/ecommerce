@@ -75,7 +75,7 @@ namespace EcommercePlatform.Repositories
             
             if (FoundProduct != null)
             {
-                var reviewsOfProduct = await dbContext.Reviews.Where(r => r.ProductId == id).ToListAsync();
+                var reviewsOfProduct = await dbContext.Reviews.Include(r => r.User).ThenInclude(u => u.AppUser).Where(r => r.ProductId == id).ToListAsync();
                 FoundProduct.Reviews = new List<Reviews>();
                 FoundProduct.Reviews.AddRange(reviewsOfProduct);
             }
@@ -115,11 +115,11 @@ namespace EcommercePlatform.Repositories
 
             if (!string.IsNullOrEmpty(parameters.searchString))
             {
-                ProductsQuery = ProductsQuery.Where(p => p.ProductTitle.Contains(parameters.searchString)).Skip(parameters.pageSize * parameters.pageNumber).Take(parameters.pageSize);
+                ProductsQuery = ProductsQuery.Where(p => p.ProductTitle.Contains(parameters.searchString)).Skip(parameters.pageSize * (parameters.pageNumber-1)).Take(parameters.pageSize);
             }
             else
             {
-                ProductsQuery = ProductsQuery.Skip(parameters.pageSize * parameters.pageNumber).Take(parameters.pageSize);
+                ProductsQuery = ProductsQuery.Skip(parameters.pageSize * (parameters.pageNumber - 1)).Take(parameters.pageSize);
             }
 
             return await ProductsQuery.ToListAsync();
@@ -160,6 +160,72 @@ namespace EcommercePlatform.Repositories
             throw new NotImplementedException();
         }
 
+        // Returns a list of { ProductId, ProductTitle, PendingOrderedQuantity }
+        public async Task<List<(Guid ProductId, string ProductTitle, int PendingOrderedQuantity)>> GetPendingOrderQuantitiesForSellerAsync(string sellerId)
+        {
+            // Get all products for this seller
+            var products = await dbContext.Products
+                .Where(p => p.SellerId == sellerId)
+                .ToListAsync();
 
+            var productIds = products.Select(p => p.Id).ToList();
+
+            // Get all pending orders for these products
+            var pendingOrders = await dbContext.Orders
+                .Where(o => productIds.Contains(o.ProductId) && o.Status == OrderStatus.Pending)
+                .ToListAsync();
+
+            // Group and sum quantities
+            var result = products
+                .Select(p => (
+                    ProductId: p.Id,
+                    ProductTitle: p.ProductTitle,
+                    PendingOrderedQuantity: pendingOrders.Where(o => o.ProductId == p.Id).Sum(o => o.Quantity)
+                ))
+                .ToList();
+
+            return result;
+        }
+
+        public async Task<List<(Guid ProductId, int PendingOrderedQuantity)>> GetPendingOrderCountsForSellerAsync(
+            string sellerId,
+            float minPrice,
+            float maxPrice,
+            int pageSize,
+            int pageNumber,
+            string? searchString,
+            DateTime? fromDate,
+            DateTime? toDate)
+        {
+            var productsQuery = dbContext.Products
+                .Where(p => p.SellerId == sellerId && p.Price >= minPrice && p.Price <= maxPrice);
+
+            if (!string.IsNullOrEmpty(searchString))
+                productsQuery = productsQuery.Where(p => p.ProductTitle.Contains(searchString));
+
+            productsQuery = productsQuery.Skip(pageSize * (pageNumber - 1)).Take(pageSize);
+
+            var productIds = await productsQuery.Select(p => p.Id).ToListAsync();
+
+            var ordersQuery = dbContext.Orders
+                .Where(o => productIds.Contains(o.ProductId) && o.Status == OrderStatus.Pending);
+
+            if (fromDate.HasValue)
+                ordersQuery = ordersQuery.Where(o => o.OrderedDate >= fromDate.Value);
+            if (toDate.HasValue)
+                ordersQuery = ordersQuery.Where(o => o.OrderedDate <= toDate.Value);
+
+            var orders = await ordersQuery.ToListAsync();
+
+            var result = orders
+                .GroupBy(o => o.ProductId)
+                .Select(g => (
+                    ProductId: g.Key,
+                    PendingOrderedQuantity: g.Sum(x => x.Quantity)
+                ))
+                .ToList();
+
+            return result;
+        }
     }
 }

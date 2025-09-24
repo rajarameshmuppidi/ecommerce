@@ -90,13 +90,72 @@ namespace EcommercePlatform.Migrations
                     b.ToTable("CartItems");
                 });
 
+            modelBuilder.Entity("EcommercePlatform.Models.DeliveryPartner", b =>
+                {
+                    b.Property<string>("UserId")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("LicenseNumber")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("VehicleNumber")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("DeliveryPartners");
+                });
+
+            modelBuilder.Entity("EcommercePlatform.Models.DeliveryPartnerAssignment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("AssignedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("DeliveredDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DeliveryPartnerId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("PickedUpDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeliveryPartnerId");
+
+                    b.HasIndex("OrderId");
+
+                    b.ToTable("DeliveryPartnerAssignments");
+                });
+
             modelBuilder.Entity("EcommercePlatform.Models.Order", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<DateTime>("DeliveryDate")
+                    b.Property<DateTime?>("DeliveryDate")
                         .HasColumnType("datetime2");
 
                     b.Property<DateTime>("ExpectedDeliveryBy")
@@ -104,6 +163,9 @@ namespace EcommercePlatform.Migrations
 
                     b.Property<DateTime>("OrderedDate")
                         .HasColumnType("datetime2");
+
+                    b.Property<byte>("PaymentMethod")
+                        .HasColumnType("tinyint");
 
                     b.Property<byte>("PaymentStatus")
                         .HasColumnType("tinyint");
@@ -201,8 +263,17 @@ namespace EcommercePlatform.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("DeliveryAddressId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<bool>("Ordered")
                         .HasColumnType("bit");
+
+                    b.Property<byte>("PaymentMethod")
+                        .HasColumnType("tinyint");
+
+                    b.Property<byte>("PaymentStatus")
+                        .HasColumnType("tinyint");
 
                     b.Property<DateTime>("UpdateDate")
                         .HasColumnType("datetime2");
@@ -212,6 +283,8 @@ namespace EcommercePlatform.Migrations
                         .HasColumnType("nvarchar(450)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("DeliveryAddressId");
 
                     b.HasIndex("UserId");
 
@@ -223,6 +296,9 @@ namespace EcommercePlatform.Migrations
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
 
                     b.Property<Guid>("ProductId")
                         .HasColumnType("uniqueidentifier");
@@ -322,7 +398,14 @@ namespace EcommercePlatform.Migrations
                             Id = "289ed434-6436-420b-8753-84addf50bc9a",
                             ConcurrencyStamp = "289ed434-6436-420b-8753-84addf50bc9a",
                             Name = "Moderator",
-                            NormalizedName = "Moderator"
+                            NormalizedName = "MODERATOR"
+                        },
+                        new
+                        {
+                            Id = "5a8e9d1b-3c7f-4a2d-b8e1-9f3c2a1b4d6e",
+                            ConcurrencyStamp = "5a8e9d1b-3c7f-4a2d-b8e1-9f3c2a1b4d6e",
+                            Name = "DeliveryPartner",
+                            NormalizedName = "DELIVERYPARTNER"
                         });
                 });
 
@@ -543,6 +626,36 @@ namespace EcommercePlatform.Migrations
                     b.Navigation("RecentCart");
                 });
 
+            modelBuilder.Entity("EcommercePlatform.Models.DeliveryPartner", b =>
+                {
+                    b.HasOne("EcommercePlatform.Models.AppUser", "AppUser")
+                        .WithOne("DeliveryPartner")
+                        .HasForeignKey("EcommercePlatform.Models.DeliveryPartner", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AppUser");
+                });
+
+            modelBuilder.Entity("EcommercePlatform.Models.DeliveryPartnerAssignment", b =>
+                {
+                    b.HasOne("EcommercePlatform.Models.DeliveryPartner", "DeliveryPartner")
+                        .WithMany()
+                        .HasForeignKey("DeliveryPartnerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EcommercePlatform.Models.Order", "Order")
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("DeliveryPartner");
+
+                    b.Navigation("Order");
+                });
+
             modelBuilder.Entity("EcommercePlatform.Models.Order", b =>
                 {
                     b.HasOne("EcommercePlatform.Models.Product", "Product")
@@ -586,11 +699,17 @@ namespace EcommercePlatform.Migrations
 
             modelBuilder.Entity("EcommercePlatform.Models.RecentCart", b =>
                 {
+                    b.HasOne("EcommercePlatform.Models.Address", "DeliveryAddress")
+                        .WithMany()
+                        .HasForeignKey("DeliveryAddressId");
+
                     b.HasOne("EcommercePlatform.Models.User", "User")
                         .WithMany("RecentCarts")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("DeliveryAddress");
 
                     b.Navigation("User");
                 });
@@ -710,6 +829,9 @@ namespace EcommercePlatform.Migrations
 
             modelBuilder.Entity("EcommercePlatform.Models.AppUser", b =>
                 {
+                    b.Navigation("DeliveryPartner")
+                        .IsRequired();
+
                     b.Navigation("Seller")
                         .IsRequired();
 

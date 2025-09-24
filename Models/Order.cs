@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
 
 namespace EcommercePlatform.Models
 {
@@ -26,11 +27,19 @@ namespace EcommercePlatform.Models
         [Required]
         public DateTime ExpectedDeliveryBy { get; set; }
 
-        [Required]
         public DateTime? DeliveryDate { get; set; }
 
         [Required]
+        [JsonConverter(typeof(JsonStringEnumConverter))]
         public OrderStatus Status { get; set; }
+
+        [Required]
+        [JsonConverter(typeof(JsonStringEnumConverter))]
+        public PaymentMethod PaymentMethod { get; set; }
+
+
+
+        [JsonConverter(typeof(JsonStringEnumConverter))]
         public PaymentStatus PaymentStatus { get; set; }
     }
 }

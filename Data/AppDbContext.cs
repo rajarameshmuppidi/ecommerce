@@ -1,6 +1,7 @@
-﻿using EcommercePlatform.Models;
+using EcommercePlatform.Models;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using System.Reflection.Emit;
 
@@ -27,6 +28,11 @@ namespace EcommercePlatform.Data
             .WithOne(u => u.Seller)
             .HasForeignKey<Seller>(p => p.UserId);
 
+            builder.Entity<DeliveryPartner>()
+            .HasOne(p => p.AppUser)
+            .WithOne(u => u.DeliveryPartner)
+            .HasForeignKey<DeliveryPartner>(p => p.UserId);
+
 
             builder.Entity<Reviews>()
              .HasOne(r => r.User)
@@ -52,6 +58,7 @@ namespace EcommercePlatform.Data
             var userRoleId = "7f1962a2-5e71-49c1-a6fd-b1c6c76bffa0";
             var sellerRoleId = "7f807728-f45c-4c45-a998-78f03013affb";
             var moderatorRoleId = "289ed434-6436-420b-8753-84addf50bc9a";
+            var deliveryPartnerRoleId = "5a8e9d1b-3c7f-4a2d-b8e1-9f3c2a1b4d6e";
 
             var roles = new List<IdentityRole> {
                 new IdentityRole
@@ -72,12 +79,31 @@ namespace EcommercePlatform.Data
                     Id = moderatorRoleId,
                     ConcurrencyStamp = moderatorRoleId,
                     Name = "Moderator",
-                    NormalizedName = "Moderator"
+                    NormalizedName = "Moderator".ToUpper()
+                },
+                new IdentityRole
+                {
+                    Id = deliveryPartnerRoleId,
+                    ConcurrencyStamp = deliveryPartnerRoleId,
+                    Name = "DeliveryPartner",
+                    NormalizedName = "DELIVERYPARTNER"
                 }
-
             };
 
             builder.Entity<IdentityRole>().HasData(roles);
+
+            // Configure DeliveryPartnerAssignment relationships
+            builder.Entity<DeliveryPartnerAssignment>()
+                .HasOne(a => a.DeliveryPartner)
+                .WithMany()
+                .HasForeignKey(a => a.DeliveryPartnerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<DeliveryPartnerAssignment>()
+                .HasOne(a => a.Order)
+                .WithMany()
+                .HasForeignKey(a => a.OrderId)
+                .OnDelete(DeleteBehavior.Restrict);
         }
 
         public DbSet<Address> Addresses { get; set; }
@@ -97,5 +123,17 @@ namespace EcommercePlatform.Data
         public DbSet<Seller> Sellers { get; set; }
 
         public DbSet<User> Users { get; set; }
+
+        public DbSet<DeliveryPartner> DeliveryPartners { get; set; }
+
+        public DbSet<DeliveryPartnerAssignment> DeliveryPartnerAssignments { get; set; }
+
+        //public void Fun()
+        //{
+        //    SqlConnection conn = new SqlConnection("this is connection string");
+
+        //    conn.Open();
+            
+        //}
     }
 }

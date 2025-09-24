@@ -24,7 +24,7 @@ namespace EcommercePlatform.Dtos
 
         public Seller? Seller { get; set; }
 
-        public List<Reviews> Reviews { get; set; }
+        public List<ReviewDto> Reviews { get; set; }
 
     }
 }

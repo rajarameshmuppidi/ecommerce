@@ -1,8 +1,14 @@
-﻿namespace EcommercePlatform
+﻿using System.Text.Json.Serialization;
+
+namespace EcommercePlatform
 {
     public enum SortSchemes:byte
     {
+        OrderedDate,
+        ExpectedDate,
         Price,
+        OrderStatus,
+        PaymentStatus,
         Relevance,
         Popularity
     }
@@ -14,6 +20,7 @@
         
     }
 
+    [JsonConverter(typeof(JsonStringEnumConverter))]
     public enum PaymentMethod:byte
     {
         Cod,

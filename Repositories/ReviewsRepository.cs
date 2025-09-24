@@ -23,6 +23,7 @@ namespace EcommercePlatform.Repositories
                 Rating = dto.Rating,
                 UserId = dto.UserId,
                 Review = dto.ReviewString,
+                CreatedAt = DateTime.UtcNow
             };
 
             await dbContext.Reviews.AddAsync(ReviewToBeCreated);

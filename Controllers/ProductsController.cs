@@ -1,7 +1,8 @@
-﻿using EcommercePlatform.Dtos;
+using EcommercePlatform.Dtos;
 using EcommercePlatform.Models;
 using EcommercePlatform.Services;
 using EcommercePlatform.Utilities;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -14,18 +15,20 @@ namespace EcommercePlatform.Controllers
     public class ProductsController : ControllerBase
     {
         private readonly IProductService productService;
-        private readonly UserManager<IdentityUser> usermanager;
+        private readonly UserManager<AppUser> userManager;
 
-        public ProductsController(IProductService productService, UserManager<IdentityUser> usermanager)
+        public ProductsController(IProductService productService, UserManager<AppUser> userManager)
         {
             this.productService = productService;
-            this.usermanager = usermanager;
+            this.userManager = userManager;
         }
 
         [HttpPost]
+        [Authorize(Roles ="Seller")]
         public async Task<ActionResult> CreateProduct([FromBody] Product product)
         {
-            var res = await productService.CreateProductAsync(product.SellerId, product);
+            string loggedInUserId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+            var res = await productService.CreateProductAsync(loggedInUserId, product);
             return Ok(res);
         }
 
@@ -38,7 +41,7 @@ namespace EcommercePlatform.Controllers
         }
 
         [HttpGet("{id}")]
-        public async Task<IActionResult> GetProductByIdAsync([FromRoute] Guid id)
+        public async Task<ActionResult<ProductDto>> GetProductByIdAsync([FromRoute] Guid id)
         {
             var product = await productService.GetProductByIdAsync(id);
             if (product == null) return NotFound("Product Not Found");
@@ -46,16 +49,23 @@ namespace EcommercePlatform.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GellAllProductsAsync([FromQuery] string? searchString, [FromQuery] float? minPrice, [FromQuery] float? maxPrice, [FromQuery] bool reverse, [FromQuery] int? pageSize, [FromQuery] int? pageNumber, [FromQuery] string? sellerId)
+        public async Task<IActionResult> GellAllProductsAsync([FromQuery] string? searchString, [FromQuery] float? minPrice, [FromQuery] float? maxPrice, [FromQuery] bool? reverse, [FromQuery] int? pageSize, [FromQuery] int? pageNumber, [FromQuery] string? sellerId)
         {
+            string? loggedInUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            string[] roles = User.Claims
+                .Where(c => c.Type == ClaimTypes.Role)
+                .Select(c => c.Value)
+                .ToArray();
+
             var parameters = new ProductParameters();
             if(searchString != null) parameters.searchString = searchString;
             if (minPrice != null) parameters.minPrice = minPrice ?? 0;
             if (maxPrice != null) parameters.maxPrice = maxPrice ?? float.MaxValue;
-            if(reverse) parameters.reverse = reverse;
-            if(pageSize!=null) parameters.pageSize = pageSize ?? 0;
-            if(pageNumber!=null) parameters.pageNumber = pageNumber ?? 0;
-            if (sellerId != null) parameters.sellerId = sellerId;
+            if(reverse!=null) parameters.reverse = reverse ?? false;
+            if(pageSize!=null) parameters.pageSize = pageSize ?? 25;
+            if(pageNumber!=null) parameters.pageNumber = pageNumber ?? 1;
+            if (loggedInUserId!=null && roles[0] == "Seller") parameters.sellerId = loggedInUserId;
 
             var res = await productService.GetAllProductsAsync(parameters);
             return Ok(res);
@@ -68,5 +78,46 @@ namespace EcommercePlatform.Controllers
             return Ok(res);
         }
 
+        [Authorize(Roles = "Seller")]
+        [HttpGet("OrderQuantities")]
+        public async Task<IActionResult> GetOrderQuantities(
+            [FromQuery] float? minPrice,
+            [FromQuery] float? maxPrice,
+            [FromQuery] int? pageSize,
+            [FromQuery] int? pageNumber,
+            [FromQuery] string? searchString,
+            [FromQuery] DateTime? fromDate,
+            [FromQuery] DateTime? toDate)
+        {
+            string? sellerId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (sellerId == null) return BadRequest("SellerId is required");
+
+            var user = await userManager.FindByIdAsync(sellerId);
+            if (user == null) return NotFound("Seller not found");
+
+            var roles = await userManager.GetRolesAsync(user);
+            if (!roles.Contains("Seller")) return BadRequest("User is not a seller");
+
+            var result = await productService.GetPendingOrderCountsForSellerAsync(
+                sellerId,
+                minPrice ?? 0,
+                maxPrice ?? float.MaxValue,
+                pageSize ?? 25,
+                pageNumber ?? 1,
+                searchString,
+                fromDate,
+                toDate
+            );
+
+            if (result == null || !result.Any())
+                return NotFound("No pending orders found for this seller's products");
+
+            var response = result.Select(r => new {
+                ProductId = r.ProductId,
+                PendingOrderQuantity = r.PendingOrderedQuantity
+            });
+
+            return Ok(response);
+        }
     }
 }

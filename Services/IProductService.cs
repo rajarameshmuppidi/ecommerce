@@ -7,13 +7,23 @@ namespace EcommercePlatform.Services
     public interface IProductService
     {
         Task<string> CreateProductAsync(string sellerId, Product product);
-        Task<Product?> GetProductByIdAsync(Guid productId);
+        Task<ProductDto?> GetProductByIdAsync(Guid productId);
 
         Task<bool> UpdateProductAsync(Guid id, ProductUpdateDto dto);
 
         Task<IEnumerable<Product>?> GetAllProductsAsync(ProductParameters parameters);
 
         Task<bool> DeleteByIdAsync(Guid id);
-        
+        Task<List<(Guid ProductId, string ProductTitle, int PendingOrderedQuantity)>> GetPendingOrderQuantitiesForSellerAsync(string sellerId);
+        Task<List<(Guid ProductId, int PendingOrderedQuantity)>> GetPendingOrderCountsForSellerAsync(
+            string sellerId,
+            float minPrice,
+            float maxPrice,
+            int pageSize,
+            int pageNumber,
+            string? searchString,
+            DateTime? fromDate,
+            DateTime? toDate
+        );
     }
 }

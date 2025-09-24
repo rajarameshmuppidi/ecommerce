@@ -1,9 +1,13 @@
+using EcommercePlatform.Models;
+using EcommercePlatform.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using System.Diagnostics.CodeAnalysis;
 
 namespace EcommercePlatform.Controllers
 {
+
     [ApiController]
     [Route("[controller]")]
     
@@ -13,12 +17,24 @@ namespace EcommercePlatform.Controllers
         {
             "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
         };
-
+        private readonly IHubContext<OrderHub> _hubContext;
         private readonly ILogger<WeatherForecastController> _logger;
 
-        public WeatherForecastController(ILogger<WeatherForecastController> logger)
+        public WeatherForecastController(ILogger<WeatherForecastController> logger, IHubContext<OrderHub> hubContext)
         {
+            _hubContext = hubContext;
             _logger = logger;
+        }
+
+        [HttpGet("signalRDemo")]
+        public async Task<IActionResult> getDataDemo()
+        {
+            //var hub = new OrderHub();
+            //var hub = app.Services.GetRequiredService<IHubContext<OrderHub>>(
+
+            await _hubContext.Clients.All.SendAsync("UpdateOrder", 1, 2);
+
+            return Ok(new { status = "Ok" });
         }
 
         [Authorize(Roles = "User")]
